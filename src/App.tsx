@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
+import emailjs from '@emailjs/browser'
 import './App.css'
 
 const services = [
@@ -11,13 +12,29 @@ const services = [
   ['Företagsstädning', 'Flexibla städlösningar för företag och verksamheter.'],
 ]
 
-const rates: Record<string, { perM2: number; min: number; rut: boolean }> = {
-  'Hemstädning': { perM2: 35, min: 500, rut: true },
-  'Flyttstädning': { perM2: 45, min: 1500, rut: true },
-  'Storstädning': { perM2: 40, min: 800, rut: true },
-  'Kontorsstädning': { perM2: 30, min: 600, rut: false },
-  'Fönsterputs': { perM2: 20, min: 400, rut: true },
-  'Företagsstädning': { perM2: 30, min: 700, rut: false },
+// Vad som faktiskt styr en offert: hur många m² en städare hinner med per timme
+// för respektive tjänst, samt timpriset. Det ger en verklig uppskattning
+// (tid × timpris) istället för ett godtyckligt pris per m².
+const HOURLY_RATE = 349 // kr/timme, före RUT-avdrag
+const MIN_HOURS_DEFAULT = 2
+const jobProfile: Record<string, { m2PerHour: number; minHours: number; rut: boolean }> = {
+  'Hemstädning': { m2PerHour: 25, minHours: MIN_HOURS_DEFAULT, rut: true },
+  'Flyttstädning': { m2PerHour: 15, minHours: 4, rut: true },
+  'Storstädning': { m2PerHour: 18, minHours: 3, rut: true },
+  'Kontorsstädning': { m2PerHour: 30, minHours: MIN_HOURS_DEFAULT, rut: false },
+  'Fönsterputs': { m2PerHour: 40, minHours: 1, rut: true },
+  'Företagsstädning': { m2PerHour: 28, minHours: MIN_HOURS_DEFAULT, rut: false },
+}
+
+function estimateQuote(service: string, area: number) {
+  const profile = jobProfile[service]
+  if (!profile) return null
+  const safeArea = Math.max(0, area || 0)
+  const rawHours = safeArea / profile.m2PerHour
+  const hours = Math.max(profile.minHours, Math.ceil(rawHours * 2) / 2) // avrundat till närmaste halvtimme
+  const price = Math.round((hours * HOURLY_RATE) / 10) * 10
+  const afterRut = profile.rut ? Math.round((price * 0.5) / 10) * 10 : price
+  return { hours, price, afterRut, rutEligible: profile.rut }
 }
 
 const reviews = [
@@ -26,6 +43,11 @@ const reviews = [
 ]
 
 const areas = ['Centrum', 'Västra Hamnen', 'Limhamn', 'Hyllie', 'Rosengård', 'Oxie', 'Bunkeflostrand']
+
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID as string | undefined
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID as string | undefined
+const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string | undefined
+const COMPANY_EMAIL = 'Maria.m.stadning@gmail.com'
 
 /** Animates a number from its previous value to `target` whenever target changes. */
 function useCountUp(target: number, duration = 600) {
@@ -98,12 +120,18 @@ function BeforeAfterSlider({ before, after }: { before: string; after: string })
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [sent, setSent] = useState(false)
   const [floatingVisible, setFloatingVisible] = useState(false)
   const [calcService, setCalcService] = useState('Hemstädning')
   const [calcArea, setCalcArea] = useState(65)
   const [scoreVisible, setScoreVisible] = useState(false)
   const scoreRef = useRef<HTMLDivElement>(null)
+
+  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [postcode, setPostcode] = useState('')
+  const [message, setMessage] = useState('')
 
   useScrollReveal()
 
@@ -123,20 +151,54 @@ function App() {
     return () => obs.disconnect()
   }, [])
 
-  const estimate = useMemo(() => {
-    const rate = rates[calcService]
-    const area = Math.max(0, calcArea || 0)
-    const price = Math.max(rate.min, Math.round((rate.perM2 * area) / 50) * 50)
-    const afterRut = Math.round((price * 0.5) / 10) * 10
-    return { price, afterRut, rutEligible: rate.rut }
-  }, [calcService, calcArea])
+  const estimate = useMemo(() => estimateQuote(calcService, calcArea), [calcService, calcArea])
 
   const scoreDisplay = useCountUp(scoreVisible ? 5 : 0, 1000)
-  const priceDisplay = useCountUp(estimate.price, 450)
-  const afterRutDisplay = useCountUp(estimate.afterRut, 450)
+  const priceDisplay = useCountUp(estimate?.price ?? 0, 450)
+  const afterRutDisplay = useCountUp(estimate?.afterRut ?? 0, 450)
+  const hoursDisplay = useCountUp(estimate?.hours ?? 0, 450)
 
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setSent(true) }
   const closeMenu = () => setMenuOpen(false)
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!estimate) return
+    setFormStatus('sending')
+
+    const templateParams = {
+      customer_name: name,
+      customer_phone: phone,
+      customer_email: email,
+      service: calcService,
+      area_m2: calcArea,
+      postcode: postcode || '–',
+      message: message || '–',
+      estimated_hours: estimate.hours,
+      estimated_price: `${estimate.price} kr`,
+      estimated_price_after_rut: estimate.rutEligible ? `${estimate.afterRut} kr` : 'Ej RUT-berättigad',
+      to_email: COMPANY_EMAIL,
+    }
+
+    try {
+      if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+        throw new Error('EmailJS är inte konfigurerat (VITE_EMAILJS_* saknas).')
+      }
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, { publicKey: EMAILJS_PUBLIC_KEY })
+      setFormStatus('sent')
+    } catch (err) {
+      console.error('Kunde inte skicka offertförfrågan:', err)
+      setFormStatus('error')
+    }
+  }
+
+  const resetForm = () => {
+    setFormStatus('idle')
+    setName(''); setPhone(''); setEmail(''); setPostcode(''); setMessage('')
+  }
+
+  const mailtoFallback = estimate ? `mailto:${COMPANY_EMAIL}?subject=${encodeURIComponent('Offertförfrågan från hemsidan')}&body=${encodeURIComponent(
+    `Namn: ${name}\nTelefon: ${phone}\nE-post: ${email}\nTjänst: ${calcService}\nYta: ${calcArea} m²\nPostnummer: ${postcode || '–'}\nMeddelande: ${message || '–'}\n\nUppskattad tid: ${estimate.hours} h\nUppskattat pris: ${estimate.price} kr${estimate.rutEligible ? ` (${estimate.afterRut} kr efter RUT-avdrag)` : ''}`
+  )}` : `mailto:${COMPANY_EMAIL}`
 
   return <>
     <header className="site-header">
@@ -152,10 +214,32 @@ function App() {
       <section className="about section" id="om-oss"><div className="about-image reveal"><img src="/images/about.jpg" alt="Städning med fokus på detaljer" width={900} height={850} loading="lazy" /></div><div className="about-copy reveal"><p className="eyebrow">OM MARIA M STÄD</p><h2>Städning du kan känna dig <em>trygg med.</em></h2><p>Maria M Städ har hjälpt kunder i Malmö sedan 2019. Vi tror att god service sitter i detaljerna: att komma i tid, lyssna på vad du behöver och lämna det riktigt rent efter oss.</p><div className="benefits"><div><b>Noggranna</b><span>Vi ser de små sakerna.</span></div><div><b>Personliga</b><span>En kontakt du kan lita på.</span></div><div><b>Flexibla</b><span>Tider och upplägg som passar.</span></div><div><b>Pålitliga</b><span>Trygg hjälp, varje gång.</span></div></div><a href="#kontakt" className="text-link">Lär känna oss <span>→</span></a></div></section>
       <section className="before-after section"><div className="section-intro reveal"><p className="eyebrow">RESULTATET TALAR</p><h2>Före och <em>efter.</em></h2><p>Dra i reglaget och se skillnaden efter en noggrann städning.</p></div><div className="reveal"><BeforeAfterSlider before="/images/before.jpg" after="/images/after.jpg" /></div></section>
       <section className="reviews section" id="omdomen"><div className="section-intro reveal"><p className="eyebrow">VAD VÅRA KUNDER SÄGER</p><h2>Omsorg som <em>märks.</em></h2></div><div className="review-summary reveal" ref={scoreRef}><b>{scoreDisplay.toFixed(1)}</b><span>i kundomdömen<br/><small>Vi är stolta över varje återkommande kund.</small></span></div><div className="quotes">{reviews.map(([name, quote], i) => <blockquote className="reveal" style={{ transitionDelay: `${i * 90}ms` }} key={name}>“{quote}”<footer>{name}</footer></blockquote>)}</div></section>
-      <section className="video-cta reveal" id="kalkylator"><video src="/videos/hero-bg.mp4" autoPlay muted loop playsInline preload="none" poster="/images/hero.jpg" aria-hidden="true" /><div className="video-cta-content"><p className="eyebrow">FÅ DITT HEM SKINANDE RENT</p><h2>Beräkna ditt pris <em>direkt.</em></h2><p>Välj tjänst och yta så ger vi dig en uppskattning direkt — ingen bindning, ingen väntan.</p><div className="calculator"><div className="calc-row"><label>Typ av städning<select value={calcService} onChange={e => setCalcService(e.target.value)}>{services.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></label><label>Storlek (m²)<input type="number" min={10} max={400} value={calcArea} onChange={e => setCalcArea(Number(e.target.value))} /></label></div><div className="calc-result"><span>Uppskattat pris</span><b>{Math.round(priceDisplay)} kr</b>{estimate.rutEligible && <small>varav {Math.round(afterRutDisplay)} kr efter RUT-avdrag</small>}</div><a className="button light" href="#kontakt">Boka till detta pris <span>→</span></a><small className="calc-disclaimer">Uppskattning baserad på yta — slutpris bekräftas alltid innan bokning.</small></div></div></section>
+      <section className="video-cta reveal" id="kalkylator"><video src="/videos/hero-bg.mp4" autoPlay muted loop playsInline preload="none" poster="/images/hero.jpg" aria-hidden="true" /><div className="video-cta-content"><p className="eyebrow">AUTOMATISK PRISUPPSKATTNING</p><h2>Beräkna ditt pris <em>direkt.</em></h2><p>Välj tjänst och yta så räknar vi ut en verklig uppskattning utifrån arbetstid och timpris — inget påhittat pris per kvadratmeter.</p><div className="calculator">
+        <div className="calc-row"><label>Typ av städning<select value={calcService} onChange={e => setCalcService(e.target.value)}>{services.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></label><label>Storlek (m²)<input type="number" min={10} max={400} value={calcArea} onChange={e => setCalcArea(Number(e.target.value))} /></label></div>
+        <div className="calc-result">
+          <div className="calc-result-row"><span>Uppskattad tid</span><b>{hoursDisplay.toFixed(1)} h</b></div>
+          <div className="calc-result-row"><span>Uppskattat pris</span><b>{Math.round(priceDisplay)} kr</b></div>
+          {estimate?.rutEligible && <div className="calc-result-row calc-result-rut"><span>Efter RUT-avdrag</span><b>{Math.round(afterRutDisplay)} kr</b></div>}
+        </div>
+        <a className="button light" href="#kontakt">Boka till detta pris <span>→</span></a>
+        <small className="calc-disclaimer">Automatisk uppskattning baserad på {HOURLY_RATE} kr/timme och tjänstens genomsnittliga tidsåtgång. Ej bindande — priset bekräftas alltid av Maria M Städ innan bokning.</small>
+      </div></div></section>
       <section className="rut reveal"><div><p className="eyebrow">RUT-AVDRAG &amp; ECO</p><h2>Lite lättare för plånboken.</h2></div><p>Som privatkund kan du använda RUT-avdrag för arbetskostnaden. Vill du städa extra miljövänligt? Fråga om vårt eco-paket med miljövänliga produkter.</p><a href="#kontakt" className="button light">Fråga oss om RUT <span>→</span></a></section>
       <section className="section areas"><div className="section-intro reveal"><p className="eyebrow">VART VI FINNS</p><h2>Vi städar i <em>hela Malmö.</em></h2><p>Oavsett var i staden du bor kommer vi gärna hem till dig.</p></div><div className="area-chips reveal">{areas.map(a => <span key={a}>{a}</span>)}</div></section>
-      <section className="contact section" id="kontakt"><div className="contact-info reveal"><p className="eyebrow">KONTAKTA OSS</p><h2>Få en kostnadsfri <em>offert.</em></h2><p>Berätta lite om vad du behöver hjälp med, så återkommer vi så snart vi kan.</p><div className="details"><a href="tel:0732770668">073-277 06 68</a><a href="mailto:Maria.m.stadning@gmail.com">Maria.m.stadning@gmail.com</a><span>Malmö · Öppet alla dagar 08:00–21:00</span></div><div className="contact-map reveal"><iframe src="https://maps.google.com/maps?q=Malm%C3%B6,Sverige&z=11&output=embed" title="Maria M Städs serviceområde i Malmö" loading="lazy" referrerPolicy="no-referrer-when-downgrade"></iframe></div></div><form className="reveal" onSubmit={submit}>{sent ? <div className="success" aria-live="polite"><b>Tack för din förfrågan!</b><p>I den färdiga webbplatsen skickas din förfrågan direkt till Maria M Städ.</p><button type="button" className="text-link" onClick={() => setSent(false)}>Skicka en ny förfrågan</button></div> : <><div className="form-grid"><label>Namn<input required placeholder="Ditt namn" /></label><label>Telefon<input required type="tel" placeholder="Ditt telefonnummer" /></label><label>E-post<input required type="email" placeholder="Din e-postadress" /></label><label>Typ av städning<select required defaultValue=""><option value="" disabled>Välj tjänst</option>{services.map(([x]) => <option key={x}>{x}</option>)}<option>Annat</option></select></label><label>Postnummer<input placeholder="Ex. 211 20" /></label><label>Bostadens storlek / m²<input placeholder="Ex. 75 m²" /></label></div><label>Meddelande<textarea placeholder="Berätta gärna mer om vad du behöver hjälp med." rows={4}></textarea></label><button className="button" type="submit">Begär kostnadsfri offert <span>→</span></button></>}</form></section>
+      <section className="contact section" id="kontakt"><div className="contact-info reveal"><p className="eyebrow">KONTAKTA OSS</p><h2>Få en kostnadsfri <em>offert.</em></h2><p>Fyll i dina uppgifter så skickas din automatiska prisuppskattning direkt till Maria M Städ, som återkommer med en bekräftad offert.</p><div className="details"><a href="tel:0732770668">073-277 06 68</a><a href="mailto:Maria.m.stadning@gmail.com">Maria.m.stadning@gmail.com</a><span>Malmö · Öppet alla dagar 08:00–21:00</span></div><div className="contact-map reveal"><iframe src="https://maps.google.com/maps?q=Malm%C3%B6,Sverige&z=11&output=embed" title="Maria M Städs serviceområde i Malmö" loading="lazy" referrerPolicy="no-referrer-when-downgrade"></iframe></div></div><form className="reveal" onSubmit={submit}>{formStatus === 'sent' ? <div className="success" aria-live="polite"><b>Tack för din förfrågan!</b><p>Din prisuppskattning ({estimate?.price} kr) skickades till Maria M Städ tillsammans med dina kontaktuppgifter. Vi återkommer så snart vi kan.</p><button type="button" className="text-link" onClick={resetForm}>Skicka en ny förfrågan</button></div> : <>
+        {estimate && <div className="form-estimate" aria-live="polite"><span>Din uppskattning: {calcService}, {calcArea} m²</span><b>{estimate.price} kr{estimate.rutEligible && ` · ${estimate.afterRut} kr efter RUT`}</b></div>}
+        <div className="form-grid">
+          <label>Namn<input required placeholder="Ditt namn" value={name} onChange={e => setName(e.target.value)} /></label>
+          <label>Telefon<input required type="tel" placeholder="Ditt telefonnummer" value={phone} onChange={e => setPhone(e.target.value)} /></label>
+          <label>E-post<input required type="email" placeholder="Din e-postadress" value={email} onChange={e => setEmail(e.target.value)} /></label>
+          <label>Typ av städning<select required value={calcService} onChange={e => setCalcService(e.target.value)}>{services.map(([x]) => <option key={x} value={x}>{x}</option>)}</select></label>
+          <label>Postnummer<input placeholder="Ex. 211 20" value={postcode} onChange={e => setPostcode(e.target.value)} /></label>
+          <label>Bostadens storlek / m²<input type="number" min={10} max={400} placeholder="Ex. 75" value={calcArea} onChange={e => setCalcArea(Number(e.target.value))} /></label>
+        </div>
+        <label>Meddelande<textarea placeholder="Berätta gärna mer om vad du behöver hjälp med." rows={4} value={message} onChange={e => setMessage(e.target.value)}></textarea></label>
+        {formStatus === 'error' && <p className="form-error" role="alert">Något gick fel och förfrågan kunde inte skickas automatiskt. <a href={mailtoFallback}>Klicka här för att skicka den via e-post istället</a>.</p>}
+        <button className="button" type="submit" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Skickar…' : <>Begär kostnadsfri offert <span>→</span></>}</button>
+      </>}</form></section>
     </main>
     <footer className="footer"><div><img src="/images/logo.png" alt="Maria M Städ" width={80} height={97} loading="lazy" /><p>Personlig och professionell städning i Malmö sedan 2019.</p></div><div><b>Snabblänkar</b><a href="#tjanster">Tjänster</a><a href="#om-oss">Om oss</a><a href="#kalkylator">Prisberäkning</a><a href="#kontakt">Kontakt</a></div><div><b>Kontakt</b><a href="tel:0732770668">073-277 06 68</a><a href="mailto:Maria.m.stadning@gmail.com">Maria.m.stadning@gmail.com</a></div><small>© 2026 Maria M Städ</small></footer>
     <a href="#kontakt" className={floatingVisible ? 'floating-cta visible' : 'floating-cta'} aria-hidden={!floatingVisible}>Få offert <span>→</span></a>
