@@ -66,10 +66,14 @@ function Home() {
     }
 
     try {
-      if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-        throw new Error('EmailJS är inte konfigurerat (VITE_EMAILJS_* saknas).')
+      if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, { publicKey: EMAILJS_PUBLIC_KEY })
+      } else {
+        // Demo utan EmailJS konfigurerat: simulera en lyckad förfrågan istället för
+        // att visa ett felmeddelande. Så fort VITE_EMAILJS_* finns skickas riktiga mejl.
+        console.info('[demo] EmailJS ej konfigurerat — simulerar skickad förfrågan.', templateParams)
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
-      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, { publicKey: EMAILJS_PUBLIC_KEY })
       setFormStatus('sent')
     } catch (err) {
       console.error('Kunde inte skicka offertförfrågan:', err)
