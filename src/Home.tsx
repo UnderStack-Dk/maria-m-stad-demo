@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { useCountUp, useScrollReveal } from './hooks'
 import { BeforeAfterSlider, AiBadge } from './components'
 import {
-  services, reviews, areas, estimateQuote, HOURLY_RATE,
+  services, reviews, areas, estimateQuote, HOURLY_RATE, jobProfile,
   EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, COMPANY_EMAIL,
 } from './data'
 
@@ -35,6 +35,10 @@ function Home() {
   }, [])
 
   const estimate = useMemo(() => estimateQuote(calcService, calcArea), [calcService, calcArea])
+  const calcProfile = jobProfile[calcService]
+  const calcDisclaimer = calcProfile
+    ? `Automatisk uppskattning för ${calcService.toLowerCase()} baserad på ${HOURLY_RATE} kr/timme och ca ${calcProfile.m2PerHour} m² per timme (minst ${calcProfile.minHours} h per uppdrag)${calcProfile.rut ? ', RUT-avdraget är redan avdraget ovan' : ''}. Ej bindande — priset bekräftas alltid av Maria M Städ innan bokning.`
+    : `Automatisk uppskattning baserad på ${HOURLY_RATE} kr/timme och tjänstens genomsnittliga tidsåtgång. Ej bindande — priset bekräftas alltid av Maria M Städ innan bokning.`
 
   const scoreDisplay = useCountUp(scoreVisible ? 5 : 0, 1000)
   const priceDisplay = useCountUp(estimate?.price ?? 0, 350)
@@ -96,7 +100,7 @@ function Home() {
         {estimate?.rutEligible && <div className="calc-result-row calc-result-rut"><span>Efter RUT-avdrag</span><b>{Math.round(afterRutDisplay)} kr</b></div>}
       </div>
       <a className="button light" href="#kontakt">Boka till detta pris <span>→</span></a>
-      <small className="calc-disclaimer">Automatisk uppskattning baserad på {HOURLY_RATE} kr/timme och tjänstens genomsnittliga tidsåtgång. Ej bindande — priset bekräftas alltid av Maria M Städ innan bokning.</small>
+      <small className="calc-disclaimer">{calcDisclaimer}</small>
     </div></div></section>
     <section className="rut reveal"><div><p className="eyebrow">RUT-AVDRAG &amp; ECO</p><h2>Lite lättare för plånboken.</h2></div><p>Som privatkund kan du använda RUT-avdrag för arbetskostnaden. Vill du städa extra miljövänligt? Fråga om vårt eco-paket med miljövänliga produkter.</p><a href="#kontakt" className="button light">Fråga oss om RUT <span>→</span></a></section>
     <section className="section areas"><div className="section-intro reveal"><p className="eyebrow">VART VI FINNS</p><h2>Vi städar i <em>hela Malmö.</em></h2><p>Oavsett var i staden du bor kommer vi gärna hem till dig.</p></div><div className="area-chips reveal">{areas.map(a => <span key={a}>{a}</span>)}</div></section>
