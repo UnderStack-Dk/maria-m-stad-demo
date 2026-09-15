@@ -245,3 +245,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .form-error{background:rgba(223,112,88,.1);border:1px solid rgba(223,112,88,.35);color:var(--navy);padding:12px 16px;border-radius:var(--radius-sm);font-size:.82rem;margin:0 0 16px}
 .form-error a{font-weight:700;text-decoration:underline}
 .button:disabled{opacity:.7;cursor:not-allowed;transform:none!important}
+
+/* --- AI sparkle badge ("Smart prisuppskattning") --- */
+.ai-grad-a{stop-color:var(--teal)}
+.ai-grad-b{stop-color:var(--teal-deep)}
+.ai-grad-c{stop-color:var(--navy)}
+.ai-badge{display:inline-flex;align-items:center;gap:8px;background:var(--glass-fill-strong);backdrop-filter:blur(14px) saturate(180%);-webkit-backdrop-filter:blur(14px) saturate(180%);border:1px solid var(--glass-border);border-radius:var(--radius-pill);padding:8px 18px 8px 12px;font-size:.7rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);box-shadow:var(--shadow-sm);margin-bottom:16px;cursor:default;transition:box-shadow .3s,color .3s}
+.ai-badge:hover{color:var(--teal-deep);box-shadow:var(--shadow-md)}
+.ai-badge-icon{width:18px;height:18px;flex-shrink:0;transform:rotate(0deg) scale(1)}
+.ai-badge:hover .ai-badge-icon{animation:ai-sparkle 1.15s cubic-bezier(.4,0,.2,1)}
+@keyframes ai-sparkle{
+  0%{transform:rotate(0deg) scale(1);filter:drop-shadow(0 0 0 rgba(95,176,183,0))}
+  30%{transform:rotate(140deg) scale(1.4);filter:drop-shadow(0 0 7px rgba(95,176,183,.9))}
+  60%{transform:rotate(230deg) scale(1.05);filter:drop-shadow(0 0 10px rgba(21,38,87,.7))}
+  100%{transform:rotate(360deg) scale(1);filter:drop-shadow(0 0 0 rgba(95,176,183,0))}
+}
+@media (prefers-reduced-motion:reduce){.ai-badge:hover .ai-badge-icon{animation:none}}
