@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
 import { useScrollReveal } from './hooks'
 import { services, serviceDetails } from './data'
+import { Seo } from './components'
 
 function ServicesPage() {
   useScrollReveal([])
   return <main>
+    <Seo title="Våra tjänster | Maria M Städ" description="Se exakt vad som ingår i varje städtjänst vi erbjuder i Malmö: hemstädning, flyttstädning, storstädning, kontor, fönster och mer." path="/tjanster" />
     <section className="page-hero reveal">
       <p className="eyebrow">VÅRA TJÄNSTER</p>
       <h1>Allt som ingår, <em>svart på vitt.</em></h1>

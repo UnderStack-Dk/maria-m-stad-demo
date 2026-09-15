@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-/** Animates a number from its previous value to `target` whenever target changes. */
+// Animates a number toward `target` whenever it changes.
 export function useCountUp(target: number, duration = 600) {
   const [display, setDisplay] = useState(target)
   const prevRef = useRef(target)
@@ -21,7 +21,7 @@ export function useCountUp(target: number, duration = 600) {
   return display
 }
 
-/** Fades + slides in any element carrying the "reveal" class once it enters the viewport. */
+// Adds .in-view to .reveal elements once they enter the viewport.
 export function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
     const els = document.querySelectorAll('.reveal:not(.in-view)')

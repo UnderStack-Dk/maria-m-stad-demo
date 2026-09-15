@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { COMPANY_PHONE_DISPLAY } from './data'
+import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY, COMPANY_EMAIL } from './data'
 
-/** Scrolls to the element matching the URL hash after each navigation, or to the top otherwise. */
+// Scrolls to the URL hash after navigation, or to the top otherwise.
 export function ScrollToHash() {
   const location = useLocation()
   useEffect(() => {
@@ -30,7 +30,7 @@ export function Header() {
       <Link onClick={closeMenu} to="/#kalkylator">Prisberäkning</Link>
       <Link onClick={closeMenu} to="/#kontakt">Kontakt</Link>
     </nav>
-    <a className="phone" href="tel:0732770668">{COMPANY_PHONE_DISPLAY}</a>
+    <a className="phone" href={`tel:${COMPANY_PHONE}`}>{COMPANY_PHONE_DISPLAY}</a>
     <Link className="button header-cta" to="/#kontakt">Få offert</Link>
   </header>
 }
@@ -47,9 +47,9 @@ export function FloatingCta() {
 
 export function Footer() {
   return <footer className="footer">
-    <div><img src="/images/logo.png" alt="Maria M Städ" width={80} height={97} loading="lazy" /><p>Personlig och professionell städning i Malmö sedan 2019.</p></div>
+    <div><img src="/images/logo.png" alt="Maria M Städ" width={80} height={97} loading="lazy" /><p>Städning i Malmö sedan 2019 — hem, kontor och verksamheter.</p></div>
     <div><b>Snabblänkar</b><Link to="/tjanster">Tjänster</Link><Link to="/om">Om oss</Link><Link to="/#kalkylator">Prisberäkning</Link><Link to="/#kontakt">Kontakt</Link></div>
-    <div><b>Kontakt</b><a href="tel:0732770668">{COMPANY_PHONE_DISPLAY}</a><a href="mailto:Maria.m.stadning@gmail.com">Maria.m.stadning@gmail.com</a></div>
+    <div><b>Kontakt</b><a href={`tel:${COMPANY_PHONE}`}>{COMPANY_PHONE_DISPLAY}</a><a href={`mailto:${COMPANY_EMAIL}`}>{COMPANY_EMAIL}</a></div>
     <small>© 2026 Maria M Städ</small>
   </footer>
 }

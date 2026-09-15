@@ -1,20 +1,17 @@
-// Delad data för hela sajten: tjänster, priskalkyl och innehåll som återanvänds
-// mellan startsidan och undersidorna (/tjanster, /om).
-
+// Tjänster, priskalkyl och texter som delas mellan startsidan och /tjanster, /om.
 export const services: [string, string][] = [
-  ['Hemstädning', 'Regelbunden städning för ett rent och trivsamt hem.'],
-  ['Flyttstädning', 'Noggrann städning inför eller efter flytt.'],
+  ['Hemstädning', 'Ett rent och trivsamt hem, vecka efter vecka.'],
+  ['Flyttstädning', 'Grundlig genomgång inför eller efter en flytt.'],
   ['Storstädning', 'En grundlig rengöring när hemmet behöver lite extra.'],
-  ['Kontorsstädning', 'Professionell städning för kontor och arbetsplatser.'],
+  ['Kontorsstädning', 'Fräscha lokaler för kontor och arbetsplatser.'],
   ['Fönsterputs', 'Rena och klara fönster utan krångel.'],
-  ['Företagsstädning', 'Flexibla städlösningar för företag och verksamheter.'],
-  ['Hotellstädning', 'Daglig städning av hotellrum och gemensamma utrymmen.'],
-  ['Studentstädning', 'Snabb och billig städning av studentrum och korridorer.'],
+  ['Företagsstädning', 'Flexibla lösningar för företag och verksamheter.'],
+  ['Hotellstädning', 'Dagligt fräscht i hotellrum och gemensamma utrymmen.'],
+  ['Studentstädning', 'Snabbt och billigt för studentrum och korridorer.'],
 ]
 
-// Vad som faktiskt styr en offert: hur många m² en städare hinner med per timme
-// för respektive tjänst, samt timpriset. Det ger en verklig uppskattning
-// (tid × timpris) istället för ett godtyckligt pris per m².
+// Priset räknas som tid × timpris, inte ett fast pris per m² — tiden beror
+// på hur många m² en städare hinner med per timme för respektive tjänst.
 export const HOURLY_RATE = 349 // kr/timme, före RUT-avdrag
 const MIN_HOURS_DEFAULT = 2
 export const jobProfile: Record<string, { m2PerHour: number; minHours: number; rut: boolean }> = {
@@ -34,8 +31,7 @@ export function estimateQuote(service: string, area: number): Estimate | null {
   const profile = jobProfile[service]
   if (!profile) return null
   const safeArea = Math.max(0, area || 0)
-  // Kontinuerlig tidsuppskattning (ingen grov avrundning till halvtimmar) så att
-  // priset faktiskt rör sig vid varje ändring av ytan, inte bara i stora hopp.
+  // Ingen avrundning till halvtimmar — priset ska ändras vid varje ändring av ytan.
   const rawHours = safeArea / profile.m2PerHour
   const hours = Math.max(profile.minHours, rawHours)
   const price = Math.round((hours * HOURLY_RATE) / 10) * 10
@@ -53,12 +49,14 @@ export const areas = ['Centrum', 'Västra Hamnen', 'Limhamn', 'Hyllie', 'Roseng�
 export const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID as string | undefined
 export const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID as string | undefined
 export const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string | undefined
+// Uppdatera till kundens egna domän när sajten går live där.
+export const SITE_URL = 'https://maria-m-stad-demo.vercel.app'
+
 export const COMPANY_EMAIL = 'Maria.m.stadning@gmail.com'
 export const COMPANY_PHONE = '0732770668'
 export const COMPANY_PHONE_DISPLAY = '073-277 06 68'
 
-// Detaljerad checklista per tjänst, hämtad från mariamstad.se/services och
-// omskriven till samma struktur för hela sajten.
+// Checklista per tjänst, baserad på mariamstad.se/services.
 export type ServiceChecklist = { room: string; items: string[] }
 export const serviceDetails: Record<string, ServiceChecklist[]> = {
   'Hemstädning': [
