@@ -10,7 +10,7 @@
 }
 *{box-sizing:border-box}
 .site-header{height:92px;padding:0 clamp(22px,5vw,78px);display:flex;align-items:center;gap:28px;background:rgba(251,253,253,.82);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);position:sticky;top:0;z-index:20;border-bottom:1px solid rgba(223,233,234,.7)}
-.brand img,.footer img{width:102px;height:64px;object-fit:contain}
+.brand img,.footer img{height:60px;width:auto;object-fit:contain}
 .site-header nav{display:flex;gap:8px;margin-left:auto;background:rgba(234,245,246,.55);border:1px solid rgba(255,255,255,.6);padding:6px;border-radius:var(--radius-pill);box-shadow:var(--shadow-sm)}
 .site-header nav a{padding:9px 16px;border-radius:var(--radius-pill);font-size:.88rem;font-weight:600;color:var(--navy);transition:.25s}
 .site-header nav a:hover{background:var(--white);color:var(--teal-deep);box-shadow:var(--shadow-sm)}
@@ -127,7 +127,7 @@ textarea{resize:vertical}
 
 @media(max-width:800px){
 .site-header{height:72px;padding:0 16px;gap:14px}
-.brand img{width:83px;height:56px}
+.brand img{height:48px}
 .phone{display:none}
 .header-cta{margin-left:auto;font-size:.76rem;padding:10px 16px}
 .menu-button{display:grid;gap:4px;border:0;background:rgba(234,245,246,.7);padding:11px 10px;border-radius:var(--radius-md);order:3;box-shadow:var(--shadow-sm)}
