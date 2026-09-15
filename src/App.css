@@ -203,3 +203,24 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .floating-cta{right:16px;bottom:16px;padding:13px 18px;font-size:.8rem}
 .calc-result b{margin-left:0}
 }
+
+/* --- scroll reveal --- */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.8,.2,1);will-change:opacity,transform}
+.reveal.in-view{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1!important;transform:none!important;transition:none!important}}
+
+/* --- before/after drag slider --- */
+.ba-slider{position:relative;height:440px;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-lg);cursor:ew-resize;touch-action:none;-webkit-user-select:none;user-select:none;margin-top:56px}
+.ba-slider img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.ba-before-wrap{position:absolute;inset:0}
+.ba-handle{position:absolute;top:0;bottom:0;width:0;transform:translateX(-50%);pointer-events:none}
+.ba-handle:before{content:'';position:absolute;top:0;bottom:0;left:0;width:3px;background:rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(21,38,87,.15),0 0 20px rgba(21,38,87,.25)}
+.ba-handle-grip{position:absolute;top:50%;left:0;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:var(--glass-fill-strong);backdrop-filter:blur(14px) saturate(180%);-webkit-backdrop-filter:blur(14px) saturate(180%);border:1px solid var(--glass-border);box-shadow:var(--shadow-glass);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:var(--navy)}
+.ba-label{position:absolute;top:16px;background:var(--glass-fill-strong);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:8px 16px;border-radius:var(--radius-pill);font-size:.73rem;font-weight:700;letter-spacing:.03em;color:var(--navy);border:1px solid var(--glass-border)}
+.ba-label-before{left:16px}
+.ba-label-after{right:16px}
+.ba-slider:focus-visible{outline:3px solid var(--teal-deep);outline-offset:4px}
+
+@media(max-width:800px){
+.ba-slider{height:300px;margin-top:37px}
+}
